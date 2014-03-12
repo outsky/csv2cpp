@@ -1,0 +1,8 @@
+csv2cpp
+cpp
+csv
+bin
+test
+core
+core.*
+run.sh

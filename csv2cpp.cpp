@@ -9,7 +9,7 @@
 using namespace std;
 
 csv2cpp::csv2cpp(const string csv_path, const string cpp_folder, const string bin_folder)
-    : csv_path(csv_path), cpp_folder(cpp_folder), bin_folder(bin_folder),
+    : csv_path(csv_path), cpp_folder(cpp_folder+"/"), bin_folder(bin_folder+"/"),
     csv_name(csv_path), csv_errno(0), error_line(-1)
 {
     size_t pos = csv_name.find_last_of("/\\");
