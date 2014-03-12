@@ -7,12 +7,13 @@
 class csv2cpp
 {
     public:
-        csv2cpp(const std::string csv_path, const std::string cpp_folder);
+        csv2cpp(const std::string csv_path, const std::string cpp_folder, const std::string bin_folder);
 
         bool load_csv();
         bool gen_cpp();
+        bool gen_bin();
 
-        int get_csv_error(int* error_line = NULL);
+        const std::string get_csv_error(int* error_line=NULL, int* error_num=NULL);
 
         void debug();
 
@@ -21,20 +22,26 @@ class csv2cpp
         bool fill_variables(const std::string& line);
         bool fill_types(const std::string& line);
         bool fill_attrs(const std::string& line);
+        bool fill_values(int n, const std::string& line);
 
         std::string header();
         std::string struct_config();
         std::string class_mgr();
         std::string footer();
 
+        void write_value_bin(char*& buf, int& tail, const std::string& v, const std::string& type);
+        void write_value_data(char*& buf, int& tail, const std::string& v);
+
     private:
         std::vector<std::string> comments;
         std::vector<std::string> variables;
         std::vector<std::string> types;
         std::vector<std::string> attrs;
+        std::vector<std::vector<std::string> > values;
 
         const std::string csv_path;
         const std::string cpp_folder;
+        const std::string bin_folder;
         std::string csv_name;
 
         //  0  - success

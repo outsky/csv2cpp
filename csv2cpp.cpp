@@ -1,13 +1,15 @@
 #include <iostream>
 #include <stdlib.h>
 #include <fstream>
+#include <string.h>
 #include "common.h"
+#include "convert.h"
 #include "csv2cpp.h"
 
 using namespace std;
 
-csv2cpp::csv2cpp(const string csv_path, const string cpp_folder)
-    : csv_path(csv_path), cpp_folder(cpp_folder),
+csv2cpp::csv2cpp(const string csv_path, const string cpp_folder, const string bin_folder)
+    : csv_path(csv_path), cpp_folder(cpp_folder), bin_folder(bin_folder),
     csv_name(csv_path), csv_errno(0), error_line(-1)
 {
     size_t pos = csv_name.find_last_of("/\\");
@@ -29,11 +31,12 @@ bool csv2cpp::load_csv()
     }
 
     string line;
-    for(int i=1; i<=4 && getline(csv, line); ++i) {
+    for(int i=1; getline(csv, line); ++i) {
         if((i==1 && !fill_comments(line)) ||
                 (i==2 && !fill_variables(line)) ||
                 (i==3 && !fill_types(line)) ||
-                (i==4 && !fill_attrs(line)))
+                (i==4 && !fill_attrs(line)) ||
+                (i>4 && !fill_values(i, line)))
             goto FAILED;
     }
 
@@ -65,11 +68,74 @@ bool csv2cpp::gen_cpp()
     return true;
 }
 
-int csv2cpp::get_csv_error(int* el)
+bool csv2cpp::gen_bin()
+{
+    string bin_path = bin_folder+csv_name+".bin";
+    string data_path = bin_folder+csv_name+".data";
+    ofstream bin;
+    ofstream data;
+    bin.open(bin_path.c_str());
+    data.open(data_path.c_str());
+    if(bin.fail() || data.fail())
+        return false;
+
+    int bin_size = 0;
+    int data_size = 0;
+    char* bin_buf = new char[1024*1000];
+    memset(bin_buf, 0, 1024*1000);
+    char* data_buf = new char[1024*1000];
+    memset(data_buf, 0, 1024*1000);
+
+    size_t cols = comments.size();
+    for(vector<vector<string> >::const_iterator it=values.begin(); it!=values.end(); ++it) {
+        for(size_t i=0; i<cols; ++i) {
+            write_value_bin(bin_buf, bin_size, (*it)[i], types[i]);
+            write_value_data(data_buf, data_size, (*it)[i]);
+        }
+    }
+
+    bin.write(bin_buf, bin_size);
+    data.write(data_buf, data_size);
+
+    bin.close();
+    data.close();
+    return true;
+}
+
+const string csv2cpp::get_csv_error(int* el, int* en)
 {
     if(el != NULL)
-        *el= error_line;
-    return csv_errno;
+        *el = error_line;
+    if(en != NULL)
+        *en = csv_errno;
+    string strerr;
+    switch( csv_errno ) {
+        case 0:
+            strerr = "success";
+            break;
+        case -1:
+            strerr = "variables cols mismatch";
+            break;
+        case -2:
+            strerr = "types cols mismatch";
+            break;
+        case -3:
+            strerr = "attrs cols mismatch";
+            break;
+        case -4:
+            strerr = "data cols mismatch";
+            break;
+        case -5:
+            strerr = "file not exist";
+            break;
+        case -6:
+            strerr = "lines mismatch";
+            break;
+        default:
+            strerr = "unknown";
+            break;
+    }
+    return strerr;
 }
 
 bool csv2cpp::fill_comments(const string& line)
@@ -124,6 +190,22 @@ bool csv2cpp::fill_attrs(const string& line)
     }
 
     string& last = attrs[attrs.size()-1];
+    str_trim(last, "\r");
+    str_trim(last, "\n");
+
+    return true;
+}
+
+bool csv2cpp::fill_values(int n, const string& line)
+{
+    values.push_back(str_split(line, -1, ','));
+    if(values.back().size() != comments.size()) {
+        csv_errno = -4;
+        error_line = n;
+        return false;
+    }
+
+    string& last = values.back()[comments.size()-1];
     str_trim(last, "\r");
     str_trim(last, "\n");
 
@@ -236,3 +318,52 @@ string csv2cpp::footer()
 {
     return "#endif // " + csv_name + "_H\n";
 }
+
+void csv2cpp::write_value_bin(char*& buf, int& tail, const string& v, const string& type)
+{
+    if(type == "int8") {
+        signed char cv = to_int8(v.c_str());
+        memcpy(buf+tail, &cv, sizeof(cv));
+        tail += sizeof(cv);
+    } else if(type == "int16") {
+        signed short cv = to_int16(v.c_str());
+        memcpy(buf+tail, &cv, sizeof(cv));
+        tail += sizeof(cv);
+    } else if(type == "int32") {
+        signed int cv = to_int32(v.c_str());
+        memcpy(buf+tail, &cv, sizeof(cv));
+        tail += sizeof(cv);
+    } else if(type == "int64") {
+        signed long long cv = to_int64(v.c_str());
+        memcpy(buf+tail, &cv, sizeof(cv));
+        tail += sizeof(cv);
+    } else if(type == "uint8") {
+        unsigned char cv = to_uint8(v.c_str());
+        memcpy(buf+tail, &cv, sizeof(cv));
+        tail += sizeof(cv);
+    } else if(type == "uint16") {
+        unsigned short cv = to_uint16(v.c_str());
+        memcpy(buf+tail, &cv, sizeof(cv));
+        tail += sizeof(cv);
+    } else if(type == "uint32") {
+        unsigned int cv = to_uint32(v.c_str());
+        memcpy(buf+tail, &cv, sizeof(cv));
+        tail += sizeof(cv);
+    } else if(type == "uint64") {
+        unsigned long long cv = to_uint64(v.c_str());
+        memcpy(buf+tail, &cv, sizeof(cv));
+        tail += sizeof(cv);
+    } else if(type == "string") {
+        short len = v.size();
+        memcpy(buf+tail, &len, sizeof(len));
+        tail += sizeof(len);
+        memcpy(buf+tail, v.c_str(), len);
+        tail += len;
+    }
+}
+
+void csv2cpp::write_value_data(char*& buf, int& tail, const string& v)
+{
+
+}
+
