@@ -24,8 +24,6 @@ class csv2cpp
         bool fill_attrs(const std::string& line);
         bool fill_values(int n, const std::string& line);
 
-        bool is_vector_has_empty_string(const std::vector<std::string>& vec);
-
         std::string header();
         std::string struct_config();
         std::string class_mgr();
