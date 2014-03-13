@@ -281,13 +281,14 @@ string csv2cpp::class_mgr()
 {
     string ret = "class " + csv_name + "ConfigMgr\n"
         "{\n"
-        "\ttypedef map<int, " + csv_name + "Config> MAP_" + csv_name + ";\n"
+        "\ttypedef map<int, " + csv_name + "Config> MAP_" + csv_name + ";\n\n"
+
         "public:\n"
         "\tint LoadData(const char* filename)\n"
         "\t{\n"
 
-        "\t\tifstream newfile ( filename, ios::binary);\n"
-        "\t\twhile (!newfile.eof())\n"
+        "\t\tifstream newfile (filename, ios::binary);\n"
+        "\t\twhile( !newfile.eof() )\n"
         "\t\t{\n"
         "\t\t\t" + csv_name + "Config config;\n"
         "\t\t\tmemset(&config, 0, sizeof(config));\n";
@@ -321,7 +322,7 @@ string csv2cpp::class_mgr()
         ret += "\t\t" + types[key1] + " key = key1*1000 + key2;\n";
 
         ret += "\t\tMAP_" + csv_name + "::iterator it = map_" + csv_name + ".find(key);\n"
-        "\t\tif (it != map_" + csv_name + ".end())\n"
+        "\t\tif(it != map_" + csv_name + ".end())\n"
         "\t\t{\n"
             "\t\t\treturn &it->second;\n"
         "\t\t}\n"
@@ -331,7 +332,7 @@ string csv2cpp::class_mgr()
     "\t" + csv_name + "Config* GetFirst()\n"
     "\t{\n"
         "\t\tit = map_" + csv_name + ".begin();\n"
-        "\t\tif (it != map_" + csv_name + ".end())\n"
+        "\t\tif(it != map_" + csv_name + ".end())\n"
         "\t\t{\n"
             "\t\t\treturn &it->second;\n"
         "\t\t}\n"
@@ -341,7 +342,7 @@ string csv2cpp::class_mgr()
     "\t" + csv_name + "Config* GetNext()\n"
     "\t{\n"
         "\t\tit++;\n"
-        "\t\tif (it != map_" + csv_name + ".end())\n"
+        "\t\tif(it != map_" + csv_name + ".end())\n"
         "\t\t{\n"
             "\t\t\treturn &it->second;\n"
         "\t\t}\n"
@@ -357,7 +358,7 @@ string csv2cpp::class_mgr()
 
 string csv2cpp::footer()
 {
-    return "#endif // " + csv_name + "_H\n";
+    return "#endif // " + csv_name + "_H\n\n";
 }
 
 void csv2cpp::write_value_bin(char*& buf, int& tail, const string& v, const string& type)
