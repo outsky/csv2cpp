@@ -75,7 +75,7 @@ bool csv2cpp::gen_bin()
     ofstream bin;
     ofstream data;
     bin.open(bin_path.c_str());
-//    data.open(data_path.c_str());
+    data.open(data_path.c_str());
     if(bin.fail() || data.fail())
         return false;
 
@@ -92,13 +92,15 @@ bool csv2cpp::gen_bin()
             write_value_bin(bin_buf, bin_size, (*it)[i], types[i]);
             write_value_data(data_buf, data_size, (*it)[i]);
         }
+        --data_size;
+        write_value_data(data_buf, data_size, "\n", false);
     }
 
     bin.write(bin_buf, bin_size);
-    //data.write(data_buf, data_size);
+    data.write(data_buf, data_size);
 
     bin.close();
- //   data.close();
+    data.close();
     return true;
 }
 
