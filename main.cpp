@@ -20,9 +20,7 @@ int main(int argc, char** argv)
     const string bin_folder(argv[3]);
 
     csv2cpp c2c(csv_path, cpp_folder, bin_folder);
-    c2c.load_csv();
-    c2c.gen_cpp();
-    c2c.gen_bin();
+    c2c.load_csv() && c2c.gen_cpp() && c2c.gen_bin();
 
     int err_num;
     int err_line;

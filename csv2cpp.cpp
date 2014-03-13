@@ -75,7 +75,7 @@ bool csv2cpp::gen_bin()
     ofstream bin;
     ofstream data;
     bin.open(bin_path.c_str());
-    data.open(data_path.c_str());
+//    data.open(data_path.c_str());
     if(bin.fail() || data.fail())
         return false;
 
@@ -95,10 +95,10 @@ bool csv2cpp::gen_bin()
     }
 
     bin.write(bin_buf, bin_size);
-    data.write(data_buf, data_size);
+    //data.write(data_buf, data_size);
 
     bin.close();
-    data.close();
+ //   data.close();
     return true;
 }
 
@@ -131,6 +131,9 @@ const string csv2cpp::get_csv_error(int* el, int* en)
         case -6:
             strerr = "lines mismatch";
             break;
+        case -7:
+            strerr = "has empty string";
+            break;
         default:
             strerr = "unknown";
             break;
@@ -141,6 +144,11 @@ const string csv2cpp::get_csv_error(int* el, int* en)
 bool csv2cpp::fill_comments(const string& line)
 {
     comments = str_split(line, -1, ',');
+    if( is_vector_has_empty_string(comments) ) {
+        error_line = 1;
+        return false;
+    }
+
     string& last = comments[comments.size()-1];
     str_trim(last, "\r");
     str_trim(last, "\n");
@@ -150,6 +158,11 @@ bool csv2cpp::fill_comments(const string& line)
 bool csv2cpp::fill_variables(const string& line)
 {
     variables = str_split(line, -1, ',');
+    if( is_vector_has_empty_string(variables) ) {
+        error_line = 2;
+        return false;
+    }
+
     if(variables.size() != comments.size()) {
         csv_errno = -1;
         error_line = 2;
@@ -166,6 +179,11 @@ bool csv2cpp::fill_variables(const string& line)
 bool csv2cpp::fill_types(const string& line)
 {
     types = str_split(line, -1, ',');
+    if( is_vector_has_empty_string(types) ) {
+        error_line = 3;
+        return false;
+    }
+
     if(types.size() != comments.size()) {
         csv_errno = -2;
         error_line = 3;
@@ -177,12 +195,16 @@ bool csv2cpp::fill_types(const string& line)
     str_trim(last, "\n");
 
     return true;
-
 }
 
 bool csv2cpp::fill_attrs(const string& line)
 {
     attrs = str_split(line, -1, ',');
+    if( is_vector_has_empty_string(attrs) ) {
+        error_line = 4;
+        return false;
+    }
+
     if(attrs.size() != comments.size()) {
         csv_errno = -3;
         error_line = 4;
@@ -365,5 +387,16 @@ void csv2cpp::write_value_bin(char*& buf, int& tail, const string& v, const stri
 void csv2cpp::write_value_data(char*& buf, int& tail, const string& v)
 {
 
+}
+
+bool csv2cpp::is_vector_has_empty_string(const vector<string>& vec)
+{
+    for(vector<string>::const_iterator it=vec.begin(); it!=vec.end(); ++it) {
+        if( (*it).empty() ) {
+            csv_errno = -7;
+            return true;
+        }
+    }
+    return false;
 }
 
