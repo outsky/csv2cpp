@@ -32,7 +32,7 @@ class csv2cpp
         std::string footer();
 
         void write_value_bin(char*& buf, int& tail, const std::string& v, const std::string& type);
-        void write_value_data(char*& buf, int& tail, const std::string& v);
+        void write_value_data(char*& buf, int& tail, const std::string& v, bool append_space=true);
 
     private:
         std::vector<std::string> comments;

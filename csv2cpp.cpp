@@ -384,9 +384,12 @@ void csv2cpp::write_value_bin(char*& buf, int& tail, const string& v, const stri
     }
 }
 
-void csv2cpp::write_value_data(char*& buf, int& tail, const string& v)
+void csv2cpp::write_value_data(char*& buf, int& tail, const string& v, bool append_space)
 {
-
+    memcpy(buf+tail, v.c_str(), v.size());
+    tail += v.size();
+    if( append_space )
+        buf[tail++] = ' ';
 }
 
 bool csv2cpp::is_vector_has_empty_string(const vector<string>& vec)
