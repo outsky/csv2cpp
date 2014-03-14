@@ -45,13 +45,14 @@ class csv2cpp
         std::string csv_name;
 
         //  0  - success
-        //  -1 - variables count mismatch
-        //  -2 - types count mismatch
-        //  -3 - attrs count mismatch
-        //  -4 - data count mismatch
+        //  -1 - variables mismatch
+        //  -2 - types mismatch
+        //  -3 - attrs mismatch
+        //  -4 - data mismatch
         //  -5 - file not exist
         //  -6 - lines mismatch
         //  -7 - has empty string
+        //  -8 - comments mismatch
         int csv_errno;
         int error_line;
 
