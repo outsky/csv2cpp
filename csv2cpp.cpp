@@ -194,7 +194,10 @@ bool csv2cpp::fill_attrs(const string& line)
         }
     }
 
-    if(key1==key2 || types[key1]=="string" || (key2!=-1 && types[key2]=="string")) {
+    if(key1 == key2)
+        key1 = 0;
+
+    if(types[key1]=="string" || (key2!=-1 && types[key2]=="string")) {
         csv_errno = -8;
         goto FAILED;
     }
@@ -214,7 +217,7 @@ bool csv2cpp::fill_values(int n, const string& line)
 
 string csv2cpp::header()
 {
-    return "// Auto generate by tool at " + date + "\n"
+    return "// Auto generated at " + date + "\n"
         "#ifndef " + csv_name + "_H\n"
         "#define " + csv_name + "_H\n"
         "#include \"configdef.hpp\"\n\n";
@@ -235,8 +238,7 @@ string csv2cpp::class_mgr()
 {
     string ret = "class " + csv_name + "ConfigMgr\n"
         "{\n"
-        "\ttypedef map<int, " + csv_name + "Config> MAP_" + csv_name + ";\n\n"
-
+        "\ttypedef map<int, " + csv_name + "Config> MAP_" + csv_name + ";\n"
         "public:\n"
         "\tint LoadData(const char* filename)\n"
         "\t{\n"
@@ -247,9 +249,9 @@ string csv2cpp::class_mgr()
         "\t\t\t" + csv_name + "Config config;\n"
         "\t\t\tmemset(&config, 0, sizeof(config));\n";
 
-    size_t size = variables.size();
+    size_t size = valid_cols.size();
     for(size_t i=0; i<size; ++i)
-        ret += "\t\t\tnewfile.read((char*)&config." + variables[i] + ", sizeof(config." + variables[i] + "));\n";
+        ret += "\t\t\tnewfile.read((char*)&config." + variables[valid_cols[i]] + ", sizeof(config." + variables[valid_cols[i]] + "));\n";
 
     ret += "\t\t\tmap_" + csv_name + ".insert(MAP_" + csv_name + "::value_type(config.";
 
