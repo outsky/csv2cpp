@@ -38,6 +38,7 @@ class csv2cpp
         std::vector<std::string> types;
         std::vector<std::string> attrs;
         std::vector<std::vector<std::string> > values;
+        int key1, key2;
 
         const std::string csv_path;
         const std::string cpp_folder;
@@ -52,7 +53,8 @@ class csv2cpp
         //  -5 - file not exist
         //  -6 - lines mismatch
         //  -7 - has empty string
-        //  -8 - comments mismatch
+        //  -8 - keys error(no key, multi, skip, or type error)
+        //  -9 - comments mismatch
         int csv_errno;
         int error_line;
 

@@ -9,7 +9,8 @@
 using namespace std;
 
 csv2cpp::csv2cpp(const string csv_path, const string cpp_folder, const string bin_folder)
-    : csv_path(csv_path), cpp_folder(cpp_folder+"/"), bin_folder(bin_folder+"/"),
+    : key1(-1), key2(-1),
+    csv_path(csv_path), cpp_folder(cpp_folder+"/"), bin_folder(bin_folder+"/"),
     csv_name(csv_path), csv_errno(0), error_line(-1)
 {
     size_t pos = csv_name.find_last_of("/\\");
@@ -136,6 +137,9 @@ const string csv2cpp::get_csv_error(int* el, int* en)
         case -7:
             strerr = "has empty string";
             break;
+        case -8:
+            strerr = "keys error(no key, multi, skip, or type error)";
+            break;
         default:
             strerr = "unknown";
             break;
@@ -187,17 +191,37 @@ bool csv2cpp::fill_types(const string& line)
 bool csv2cpp::fill_attrs(const string& line)
 {
     attrs = str_split(line, -1, ',');
-    if(attrs.size() != comments.size()) {
-        csv_errno = -3;
-        error_line = 4;
-        return false;
-    }
-
-    string& last = attrs[attrs.size()-1];
+    string& last = attrs.back();
     str_trim(last, "\r");
     str_trim(last, "\n");
 
+    int size = attrs.size();
+    for(int i=0; i<size; ++i) {
+        if(attrs[i]=="key" || attrs[i]=="key1") {
+            if(key1 != -1) {
+                csv_errno = -8;
+                goto FAILED;
+            }
+            key1 = i;
+        } else if(attrs[i] == "key2") {
+            if(key1==-1 || key2!=-1) {
+                csv_errno = -8;
+                goto FAILED;
+            }
+            key2 = i;
+        }
+    }
+
+    if(key1==key2 || types[key1]=="string" || (key2!=-1 && types[key2]=="string")) {
+        csv_errno = -8;
+        goto FAILED;
+    }
+
     return true;
+
+FAILED:
+    error_line = 4;
+    return false;
 }
 
 bool csv2cpp::fill_values(int n, const string& line)
@@ -238,15 +262,15 @@ void csv2cpp::debug()
 
 string csv2cpp::header()
 {
-    return "// Auto generate by tool at " + date + "\n" +
-        "#ifndef " + csv_name + "_H\n" +
-        "#define " + csv_name + "_H\n" +
+    return "// Auto generate by tool at " + date + "\n"
+        "#ifndef " + csv_name + "_H\n"
+        "#define " + csv_name + "_H\n"
         "#include \"configdef.hpp\"\n\n";
 }
 
 string csv2cpp::struct_config()
 {
-    string ret = "struct " + csv_name + "Config\n" +
+    string ret = "struct " + csv_name + "Config\n"
         "{\n";
     size_t size = comments.size();
     for(size_t i=0; i<size; ++i)
@@ -257,62 +281,78 @@ string csv2cpp::struct_config()
 
 string csv2cpp::class_mgr()
 {
-    string ret = "class " + csv_name + "ConfigMgr\n" +
-        "{\n" +
-        "\ttypedef map<int, " + csv_name + "Config> MAP_" + csv_name + ";\n" +
-        "public:\n" +
-        "\tint LoadData(const char* filename)\n" +
-        "\t{\n" +
+    string ret = "class " + csv_name + "ConfigMgr\n"
+        "{\n"
+        "\ttypedef map<int, " + csv_name + "Config> MAP_" + csv_name + ";\n\n"
 
-        "\t\tifstream newfile ( filename, ios::binary);\n" +
-        "\t\twhile (!newfile.eof())\n" +
-        "\t\t{\n" +
-        "\t\t\t" + csv_name + "Config config;\n" +
+        "public:\n"
+        "\tint LoadData(const char* filename)\n"
+        "\t{\n"
+
+        "\t\tifstream newfile (filename, ios::binary);\n"
+        "\t\twhile( !newfile.eof() )\n"
+        "\t\t{\n"
+        "\t\t\t" + csv_name + "Config config;\n"
         "\t\t\tmemset(&config, 0, sizeof(config));\n";
 
     size_t size = variables.size();
     for(size_t i=0; i<size; ++i)
         ret += "\t\t\tnewfile.read((char*)&config." + variables[i] + ", sizeof(config." + variables[i] + "));\n";
 
-    ret += "\t\t\tmap_" + csv_name + ".insert(MAP_" + csv_name + "::value_type(config." + variables[0] + ", config));\n" +
-        "\t\t}\n" +
-        "\t\tnewfile.close();\n" +
-        "\t\tmap_" + csv_name + ".erase(0);\n" +
-        "\t\treturn 0;\n" +
-    "\t}\n\n" +
+    ret += "\t\t\tmap_" + csv_name + ".insert(MAP_" + csv_name + "::value_type(config.";
 
-    "\t" + csv_name + "Config* GetConfig(uint32 key)\n" +
-    "\t{\n" +
-        "\t\tMAP_" + csv_name + "::iterator it = map_" + csv_name + ".find(key);\n" +
-        "\t\tif (it != map_" + csv_name + ".end())\n" +
-        "\t\t{\n" +
-            "\t\t\treturn &it->second;\n" +
-        "\t\t}\n" +
+    if(key2 == -1)
+        ret += variables[key1];
+    else
+        ret += variables[key1]+ "*1000+config." + variables[key2];
+    ret += ", config));\n"
+        "\t\t}\n"
+        "\t\tnewfile.close();\n"
+        "\t\tmap_" + csv_name + ".erase(0);\n"
+        "\t\treturn 0;\n"
+    "\t}\n\n";
+
+    ret += "\t" + csv_name + "Config* GetConfig(";
+    if(key2 == -1)
+        ret += types[key1] + " key";
+    else
+        ret += types[key1] + " key1, " + types[key2] + " key2";
+    ret += ")\n"
+    "\t{\n";
+
+    if(key2 != -1)
+        ret += "\t\t" + types[key1] + " key = key1*1000 + key2;\n";
+
+        ret += "\t\tMAP_" + csv_name + "::iterator it = map_" + csv_name + ".find(key);\n"
+        "\t\tif(it != map_" + csv_name + ".end())\n"
+        "\t\t{\n"
+            "\t\t\treturn &it->second;\n"
+        "\t\t}\n"
         "\t\treturn NULL;\n"
-    "\t}\n\n" +
+    "\t}\n\n"
 
-    "\t" + csv_name + "Config* GetFirst()\n" +
-    "\t{\n" +
-        "\t\tit = map_" + csv_name + ".begin();\n" +
-        "\t\tif (it != map_" + csv_name + ".end())\n" +
-        "\t\t{\n" +
-            "\t\t\treturn &it->second;\n" +
-        "\t\t}\n" +
-        "\t\treturn NULL;\n" +
-    "\t}\n\n" +
+    "\t" + csv_name + "Config* GetFirst()\n"
+    "\t{\n"
+        "\t\tit = map_" + csv_name + ".begin();\n"
+        "\t\tif(it != map_" + csv_name + ".end())\n"
+        "\t\t{\n"
+            "\t\t\treturn &it->second;\n"
+        "\t\t}\n"
+        "\t\treturn NULL;\n"
+    "\t}\n\n"
 
-    "\t" + csv_name + "Config* GetNext()\n" +
-    "\t{\n" +
-        "\t\tit++;\n" +
-        "\t\tif (it != map_" + csv_name + ".end())\n" +
-        "\t\t{\n" +
-            "\t\t\treturn &it->second;\n" +
-        "\t\t}\n" +
-        "\t\treturn NULL;\n" +
-    "\t}\n\n" +
-"private:\n" +
-    "\tMAP_" + csv_name + "::iterator it;\n" +
-    "\tMAP_" + csv_name + " map_" + csv_name + ";\n" +
+    "\t" + csv_name + "Config* GetNext()\n"
+    "\t{\n"
+        "\t\tit++;\n"
+        "\t\tif(it != map_" + csv_name + ".end())\n"
+        "\t\t{\n"
+            "\t\t\treturn &it->second;\n"
+        "\t\t}\n"
+        "\t\treturn NULL;\n"
+    "\t}\n\n"
+"private:\n"
+    "\tMAP_" + csv_name + "::iterator it;\n"
+    "\tMAP_" + csv_name + " map_" + csv_name + ";\n"
 "};\n\n";
 
     return ret;
@@ -320,7 +360,7 @@ string csv2cpp::class_mgr()
 
 string csv2cpp::footer()
 {
-    return "#endif // " + csv_name + "_H\n";
+    return "#endif // " + csv_name + "_H\n\n";
 }
 
 void csv2cpp::write_value_bin(char*& buf, int& tail, const string& v, const string& type)
