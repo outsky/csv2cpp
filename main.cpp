@@ -33,7 +33,5 @@ int main(int argc, char** argv)
     if( all )
         cout << "[OK] " << csv_path << endl;
 
-    //c2c.debug();
-
     return 0;
 }

@@ -33,6 +33,8 @@ bool csv2cpp::load_csv()
 
     string line;
     for(int i=1; getline(csv, line); ++i) {
+        str_trim(line, "\r");
+        str_trim(line, "\n");
         if((i==1 && !fill_comments(line)) ||
                 (i==2 && !fill_variables(line)) ||
                 (i==3 && !fill_types(line)) ||
@@ -40,6 +42,10 @@ bool csv2cpp::load_csv()
                 (i>4 && !fill_values(i, line)))
             goto FAILED;
     }
+
+    fill_valid_cols();
+    if( !check_valid() )
+        goto FAILED;
 
     csv.close();
     return true;
@@ -87,11 +93,11 @@ bool csv2cpp::gen_bin()
     char* data_buf = new char[1024*1000];
     memset(data_buf, 0, 1024*1000);
 
-    size_t cols = comments.size();
+    size_t cols = valid_cols.size();
     for(vector<vector<string> >::const_iterator it=values.begin(); it!=values.end(); ++it) {
         for(size_t i=0; i<cols; ++i) {
-            write_value_bin(bin_buf, bin_size, (*it)[i], types[i]);
-            write_value_data(data_buf, data_size, (*it)[i]);
+            write_value_bin(bin_buf, bin_size, (*it)[valid_cols[i]], types[valid_cols[i]]);
+            write_value_data(data_buf, data_size, (*it)[valid_cols[i]]);
         }
         --data_size;
         write_value_data(data_buf, data_size, "\n", false);
@@ -117,16 +123,16 @@ const string csv2cpp::get_csv_error(int* el, int* en)
             strerr = "success";
             break;
         case -1:
-            strerr = "variables cols mismatch";
+            strerr = "variables mismatch";
             break;
         case -2:
-            strerr = "types cols mismatch";
+            strerr = "types mismatch";
             break;
         case -3:
-            strerr = "attrs cols mismatch";
+            strerr = "attrs mismatch(miss or wrong type)";
             break;
         case -4:
-            strerr = "data cols mismatch";
+            strerr = "data mismatch";
             break;
         case -5:
             strerr = "file not exist";
@@ -140,6 +146,9 @@ const string csv2cpp::get_csv_error(int* el, int* en)
         case -8:
             strerr = "keys error(no key, multi, skip, or type error)";
             break;
+        case -9:
+            strerr = "comments mismatch";
+            break;
         default:
             strerr = "unknown";
             break;
@@ -150,51 +159,24 @@ const string csv2cpp::get_csv_error(int* el, int* en)
 bool csv2cpp::fill_comments(const string& line)
 {
     comments = str_split(line, -1, ',');
-    string& last = comments[comments.size()-1];
-    str_trim(last, "\r");
-    str_trim(last, "\n");
     return true;
 }
 
 bool csv2cpp::fill_variables(const string& line)
 {
     variables = str_split(line, -1, ',');
-    if(variables.size() != comments.size()) {
-        csv_errno = -1;
-        error_line = 2;
-        return false;
-    }
-
-    string& last = variables[variables.size()-1];
-    str_trim(last, "\r");
-    str_trim(last, "\n");
-
     return true;
 }
 
 bool csv2cpp::fill_types(const string& line)
 {
     types = str_split(line, -1, ',');
-    if(types.size() != comments.size()) {
-        csv_errno = -2;
-        error_line = 3;
-        return false;
-    }
-
-    string& last = types[types.size()-1];
-    str_trim(last, "\r");
-    str_trim(last, "\n");
-
     return true;
 }
 
 bool csv2cpp::fill_attrs(const string& line)
 {
     attrs = str_split(line, -1, ',');
-    string& last = attrs.back();
-    str_trim(last, "\r");
-    str_trim(last, "\n");
-
     int size = attrs.size();
     for(int i=0; i<size; ++i) {
         if(attrs[i]=="key" || attrs[i]=="key1") {
@@ -227,37 +209,7 @@ FAILED:
 bool csv2cpp::fill_values(int n, const string& line)
 {
     values.push_back(str_split(line, -1, ','));
-    if(values.back().size() != comments.size()) {
-        csv_errno = -4;
-        error_line = n;
-        return false;
-    }
-
-    string& last = values.back()[comments.size()-1];
-    str_trim(last, "\r");
-    str_trim(last, "\n");
-
     return true;
-}
-
-void csv2cpp::debug()
-{
-    int size = comments.size();
-    for(int i=0; i<size; ++i)
-        cout << comments[i] << "\t";
-    cout << endl;
-
-    for(int i=0; i<size; ++i)
-        cout << variables[i] << "\t";
-    cout << endl;
-
-    for(int i=0; i<size; ++i)
-        cout << types[i] << "\t";
-    cout << endl;
-
-    for(int i=0; i<size; ++i)
-        cout << attrs[i] << "\t";
-    cout << endl;
 }
 
 string csv2cpp::header()
@@ -272,9 +224,9 @@ string csv2cpp::struct_config()
 {
     string ret = "struct " + csv_name + "Config\n"
         "{\n";
-    size_t size = comments.size();
+    size_t size = valid_cols.size();
     for(size_t i=0; i<size; ++i)
-        ret += ("\t"+types[i]+" "+variables[i]+";\t"+"// "+comments[i]+"\n");
+        ret += ("\t"+types[valid_cols[i]]+" "+variables[valid_cols[i]]+";\t"+"// "+comments[valid_cols[i]]+"\n");
     ret += "};\n\n";
     return ret;
 }
@@ -304,7 +256,7 @@ string csv2cpp::class_mgr()
     if(key2 == -1)
         ret += variables[key1];
     else
-        ret += variables[key1]+ "*1000+config." + variables[key2];
+        ret += variables[key1]+ "*10000+config." + variables[key2];
     ret += ", config));\n"
         "\t\t}\n"
         "\t\tnewfile.close();\n"
@@ -321,7 +273,7 @@ string csv2cpp::class_mgr()
     "\t{\n";
 
     if(key2 != -1)
-        ret += "\t\t" + types[key1] + " key = key1*1000 + key2;\n";
+        ret += "\t\t" + types[key1] + " key = key1*10000 + key2;\n";
 
         ret += "\t\tMAP_" + csv_name + "::iterator it = map_" + csv_name + ".find(key);\n"
         "\t\tif(it != map_" + csv_name + ".end())\n"
@@ -414,3 +366,37 @@ void csv2cpp::write_value_data(char*& buf, int& tail, const string& v, bool appe
         buf[tail++] = ' ';
 }
 
+void csv2cpp::fill_valid_cols()
+{
+    size_t size = variables.size();
+    for(size_t i=0; i<size; ++i) {
+        if( !variables[i].empty() )
+            valid_cols.push_back(i);
+    }
+}
+
+bool csv2cpp::check_valid()
+{
+    size_t size = valid_cols.size();
+    for(size_t i=0; i<size; ++i) {
+        if( comments[valid_cols[i]].empty() ) {
+            csv_errno = -9;
+            error_line = 1;
+            return false;
+        } else if( types[valid_cols[i]].empty() ) {
+            csv_errno = -2;
+            error_line = 3;
+            return false;
+        } else if( !is_valid_attr( attrs[valid_cols[i]] ) ) {
+            csv_errno = -3;
+            error_line = 4;
+            return false;
+        }
+    }
+    return true;
+}
+
+bool csv2cpp::is_valid_attr(const string& str)
+{
+    return str=="all" || str=="key" || str=="key1" || str=="key2" || str=="client" || str=="server";
+}

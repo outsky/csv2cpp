@@ -15,8 +15,6 @@ class csv2cpp
 
         const std::string get_csv_error(int* error_line=NULL, int* error_num=NULL);
 
-        void debug();
-
     private:
         bool fill_comments(const std::string& line);
         bool fill_variables(const std::string& line);
@@ -32,12 +30,18 @@ class csv2cpp
         void write_value_bin(char*& buf, int& tail, const std::string& v, const std::string& type);
         void write_value_data(char*& buf, int& tail, const std::string& v, bool append_space=true);
 
+        void fill_valid_cols();
+        bool check_valid();
+
+        bool is_valid_attr(const std::string& str);
+
     private:
         std::vector<std::string> comments;
         std::vector<std::string> variables;
         std::vector<std::string> types;
         std::vector<std::string> attrs;
         std::vector<std::vector<std::string> > values;
+        std::vector<size_t> valid_cols;
         int key1, key2;
 
         const std::string csv_path;
@@ -48,7 +52,7 @@ class csv2cpp
         //  0  - success
         //  -1 - variables mismatch
         //  -2 - types mismatch
-        //  -3 - attrs mismatch
+        //  -3 - attrs mismatch(miss or wrong type)
         //  -4 - data mismatch
         //  -5 - file not exist
         //  -6 - lines mismatch
